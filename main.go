@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-
-	"github.com/calvincs/inodexia/webserver/webserver"
 )
 
 var waitgroup = sync.WaitGroup{}
@@ -14,6 +12,6 @@ func main() {
 	fmt.Println("hello")
 
 	waitgroup.Add(1)
-	go webserver.HTTPServer()
+	go HTTPServer()
 	waitgroup.Wait()
 }

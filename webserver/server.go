@@ -32,6 +32,7 @@ func WriteHandler(ctx *routing.Context) error {
 	case "application/x-ndjson":
 		//new line delimited json entries
 		log.Print(rawheaders, " New Line JSON")
+		//WriteToWAL(rawheaders)
 	case "application/json":
 		log.Print(rawheaders, " JSON")
 	default:
@@ -58,7 +59,6 @@ func GetInformation(ctx *routing.Context) error {
 // HTTPServer Setup
 func HTTPServer() {
 	router := routing.New()
-
 	router.Post("/write/*", WriteHandler)
 	router.Get("/info/*", GetInformation)
 
