@@ -12,7 +12,8 @@ var waitgroup = sync.WaitGroup{}
 //Entry Point
 func main() {
 	fmt.Println("hello")
-	webserver.HTTPServer()
+
 	waitgroup.Add(1)
+	webserver.HTTPServer()
 	waitgroup.Wait()
 }
