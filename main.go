@@ -1,19 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"inodexia/webserver"
 	"sync"
-
-	"github.com/calvincs/inodexia/webserver"
 )
 
 var waitgroup = sync.WaitGroup{}
 
 //Entry Point
 func main() {
-	fmt.Println("hello")
-
 	waitgroup.Add(1)
-	webserver.HTTPServer()
+	go webserver.HTTPServer()
 	waitgroup.Wait()
 }
