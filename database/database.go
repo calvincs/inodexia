@@ -1,9 +1,12 @@
 package database
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	_ "fmt"
 	"os"
+	"strings"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 	"github.com/klauspost/compress/snappy"
@@ -54,48 +57,57 @@ func WriteToWAL(packet LogPacket) {
 	check(err)
 
 	//Lets compress the text
-	encoded := snappy.Encode(nil, encodedData)
-
-	f.Write(encoded)
-
-	f.WriteString("0\r0\r")
+	compressed := snappy.Encode(nil, encodedData)
+	output := append(compressed, []byte("0000\n")...)
+	f.Write(output)
 	f.Sync()
 
-	//Decode Testing
-	// var h LogPacket
-	// bytesRead, err := xdr.Unmarshal(bytes.NewReader(encodedData), &h)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
+}
 
-	// fmt.Println("bytes read:", bytesRead)
-	// fmt.Println("size:", len(snappy.Encode(nil, encodedData)))
-	// fmt.Printf("h: %+v", h)
+// A fucntion for the scanner.Scan for reading the WAL file
+func walSplitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
-	//OLD STUFF
-	// Current Time in MS
-	//nanos := time.Now().Unix()
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
 
-	//Lets compress the data
-	//compressedData := snappy.Encode(nil, data)
+	if i := strings.Index(string(data), "0000\n"); i >= 0 {
+		return i + 5, data[0:i], nil
+	}
 
-	//indexHead := strings.Split(index, "/")[0]
-	//We only want the base of the index, all data will be written here
-	//println("WAL: ", nanos, " ", indexHead, " ", string(compressedData))
-	// var msg strings.Builder
-	// msg.WriteString(strconv.FormatInt(nanos, 10))
-	// msg.WriteString(indexHead)
-	// msg.WriteString(string(compressedData))
-	// msg.WriteString("\n")
+	if atEOF {
+		return len(data), data, nil
+	}
 
-	// println(msg.String())
-	//:= string(nanos , ":" . indexHead + ":" + string(data)
+	return
+}
 
-	// file, error := os.OpenFile(indexHead, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	// check(error)
-	// defer file.Close()
+// ReadFromWAL - Get data from the WAL
+func ReadFromWAL(filePath string, data chan<- LogPacket) {
 
-	// file.Write(msg
+	// Read the file
+	file, error := os.Open(filePath)
+	check(error)
+	defer file.Close()
 
+	// Create the Scanner
+	scanner := bufio.NewScanner(file)
+	scanner.Split(walSplitFunc)
+
+	//Recreate the objects from the WAL file for reading
+	for scanner.Scan() {
+		text := scanner.Text()
+		expanded, err := snappy.Decode(nil, []byte(text))
+		check(err)
+
+		//Decode DataType LogPacket
+		var h LogPacket
+		bytesRead, err := xdr.Unmarshal(bytes.NewReader(expanded), &h)
+		_ = bytesRead
+		if err != nil {
+			fmt.Println(err)
+		}
+		data <- h
+	}
+	close(data)
 }

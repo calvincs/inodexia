@@ -66,6 +66,9 @@ func WriteHandler(ctx *routing.Context) error {
 	Future things for here
 */
 func GetInformation(ctx *routing.Context) error {
+	// var path string = "/Users/Calvincs/Duplicati/inodexia/testing.dat"
+	// data := database.ReadFromWAL(path)
+
 	fmt.Fprintf(ctx, "stuff %s", ctx.Path())
 	return nil
 }
