@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	_ "fmt"
+	_ "fmt" //Non used return value exclusion
 	"os"
 	"strings"
+	"time"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 	"github.com/klauspost/compress/snappy"
@@ -46,9 +47,8 @@ func WriteToWAL(packet LogPacket) {
 
 	encodedData := packetBuffer.Bytes()
 	fmt.Println("bytes written:", bytesWritten)
-	//fmt.Println("encoded data:", string(encodedData))
-
-	filename := "testing.dat"
+	tenMinBucket := (time.Now().Unix() / 600) * 600
+	filename := fmt.Sprintf("%v_%v.snap", tenMinBucket, packet.IndexHead)
 
 	//Write data to file
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -70,15 +70,12 @@ func walSplitFunc(data []byte, atEOF bool) (advance int, token []byte, err error
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
-
 	if i := strings.Index(string(data), "0000\n"); i >= 0 {
 		return i + 5, data[0:i], nil
 	}
-
 	if atEOF {
 		return len(data), data, nil
 	}
-
 	return
 }
 

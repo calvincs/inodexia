@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"inodexia/database"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,41 +23,42 @@ func check(e error) {
 /*
 	POST <uri> HTTP/1.1
 	Host: <uri.host>
-	Content-Type: application/x-ndjson
+	Content-Type: application/x-ndjson || application/json
 	Content-Length: <byte_size>
-
-	<json_encoded_log>
-	<json_encoded_log>
-	<json_encoded_log>
 */
 func WriteHandler(ctx *routing.Context) error {
 
-	//Get the Index Path of the write
-	indexHead := strings.Replace(string(ctx.Path()), "/write/", "", -1)
-	//log.Print(index)
-	//database.WriteToWAL(index, ctx.PostBody())
+	//Get the Path values
+	indexPath := strings.Replace(string(ctx.Path()), "/write/", "", -1)
+	if indexPath == "" {
+		indexPath = "default"
+	}
+	tmp := strings.SplitAfter(indexPath, "/")
+	indexHead := strings.TrimRight(tmp[0], "/")
+	indexPath = strings.TrimRight(indexPath, "/")
 
-	//Get the Header for the content type, how are we going to handle this
+	//Ensure pathing is proper
+	isValidPathChar := regexp.MustCompile(`^[A-Za-z0-9\/\.\-\_]+$`).MatchString
+	for _, pathchar := range []string{indexPath} {
+		if !isValidPathChar(pathchar) {
+			ctx.Error("invalid path detected", 400)
+			return nil
+		}
+	}
+
+	//Get the Header, validate type, push to Ingestion Enging
 	rawHeaders := string(ctx.Request.Header.Peek("Content-Type"))
-	// switch rawHeaders {
-	// case "application/x-ndjson":
-	// 	//new line delimited json entries
-	// 	log.Print(rawHeaders, " New Line JSON")
-	// 	//WriteToWAL(rawheaders)
-	// case "application/json":
-	// 	log.Print(rawHeaders, " JSON")
-	// default:
-	// 	log.Print("No Valid entry found, sending error")
-	// 	ctx.Error("invalid headers detected", 503)
-	// }
-
-	//Send the data onward to the Ingestion Engine for indexing
-	database.IngestionEngine(database.LogPacket{
-		TimeAtIndex: time.Now().Unix(),
-		IndexHead:   indexHead,
-		IndexPath:   indexHead,
-		DataBlob:    ctx.PostBody(),
-		DataType:    rawHeaders})
+	if rawHeaders == "application/x-ndjson" || rawHeaders == "application/json" {
+		//Send the data onward to the Ingestion Engine for indexing
+		database.IngestionEngine(database.LogPacket{
+			TimeAtIndex: time.Now().Unix(),
+			IndexHead:   indexHead,
+			IndexPath:   indexPath,
+			DataBlob:    ctx.PostBody(),
+			DataType:    rawHeaders})
+	} else {
+		ctx.Error("invalid headers detected", 415)
+	}
 
 	return nil
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"inodexia/database"
+	"inodexia/webserver"
 	"sync"
 )
 
@@ -9,15 +9,20 @@ var waitgroup = sync.WaitGroup{}
 
 //Entry Point
 func main() {
-	//waitgroup.Add(1)
-	//go webserver.HTTPServer()
+	waitgroup.Add(1)
+	go webserver.HTTPServer()
+	waitgroup.Wait()
 
-	data := make(chan database.LogPacket)
-	go database.ReadFromWAL("/Users/Calvincs/Duplicati/inodexia/testing.dat", data)
+	//data := make(chan database.LogPacket)
+	//go database.ReadFromWAL("/Users/Calvincs/Duplicati/inodexia/testing.dat", data)
 
-	for x := range data {
-		println(x.TimeAtIndex, x.IndexPath, x.DataType)
-	}
+	// for x := range data {
+	// 	println("*****************************************************", x.TimeAtIndex, x.IndexPath, x.DataType)
+	// 	println(string(x.DataBlob))
+	// }
 
-	//waitgroup.Wait()
+	//Latest Hour
+	// tenMinBucket := (time.Now().Unix() / 600) * 600
+	// println(tenMinBucket)
+
 }
