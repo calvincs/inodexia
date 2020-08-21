@@ -10,8 +10,25 @@ import (
 	"time"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
+	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/klauspost/compress/snappy"
 )
+
+// Globals
+var cfgDb ConfigInodexiaDatabase
+
+func init() {
+	// Import configuration file
+	err := cleanenv.ReadConfig("config.yml", &cfgDb)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ConfigInodexiaDatabase - Configuration settings
+type ConfigInodexiaDatabase struct {
+	IndexPath string `yaml:"indexPath"`
+}
 
 // LogPacket - Raw incoming data packets for processing
 type LogPacket struct {
@@ -48,20 +65,30 @@ func WriteToWAL(packet LogPacket) {
 	encodedData := packetBuffer.Bytes()
 	fmt.Println("bytes written:", bytesWritten)
 	tenMinBucket := (time.Now().Unix() / 600) * 600
-	filename := fmt.Sprintf("%v_%v.snap", tenMinBucket, packet.IndexHead)
+	filename := fmt.Sprintf("%v.snap", tenMinBucket)
+
+	//Set the basepath
+	basePath := cfgDb.IndexPath + string(os.PathSeparator) + packet.IndexHead
+
+	//Make the indexing directory if it doesnt already exist
+	if _, err := os.Stat(basePath); os.IsNotExist(err) {
+		os.Mkdir(basePath, os.ModeDir)
+	}
+
+	//Construct the fullPath of the WAL file to be written
+	fullPath := basePath + string(os.PathSeparator) + filename
 
 	//Write data to file
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile(fullPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	defer f.Close()
-
 	check(err)
 
 	//Lets compress the text
 	compressed := snappy.Encode(nil, encodedData)
-	output := append(compressed, []byte("0000\n")...)
+	output := append(compressed, []byte("00\n")...)
 	f.Write(output)
+	//Ensure its written to the disk
 	f.Sync()
-
 }
 
 // A fucntion for the scanner.Scan for reading the WAL file
@@ -70,8 +97,8 @@ func walSplitFunc(data []byte, atEOF bool) (advance int, token []byte, err error
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
-	if i := strings.Index(string(data), "0000\n"); i >= 0 {
-		return i + 5, data[0:i], nil
+	if i := strings.Index(string(data), "00\n"); i >= 0 {
+		return i + 3, data[0:i], nil
 	}
 	if atEOF {
 		return len(data), data, nil

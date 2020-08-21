@@ -8,9 +8,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ilyakaznacheev/cleanenv"
 	routing "github.com/qiangxue/fasthttp-routing"
 	"github.com/valyala/fasthttp"
 )
+
+// Globals
+var cfgWS ConfigInodexiaWebserver
+
+func init() {
+	// Import configuration file
+	err := cleanenv.ReadConfig("config.yml", &cfgWS)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// ConfigInodexiaWebserver - Configuration settings
+type ConfigInodexiaWebserver struct {
+	ServerPort string `yaml:"serverPort"`
+}
 
 // Handle errors, panic for now
 func check(e error) {
@@ -76,12 +93,14 @@ func GetInformation(ctx *routing.Context) error {
 }
 
 // HTTPServer Setup
-func HTTPServer() {
+func HTTPServer(serverPort string) {
 	router := routing.New()
 	router.Post("/write/*", WriteHandler)
 	router.Get("/info/*", GetInformation)
 
-	error := fasthttp.ListenAndServe(":8080", router.HandleRequest)
+	// Start the webserver
+	port := ":" + cfgWS.ServerPort
+	error := fasthttp.ListenAndServe(port, router.HandleRequest)
 	if error != nil {
 		log.Fatal(error)
 	}
